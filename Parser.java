@@ -38,10 +38,14 @@ public class Parser implements IParser {
       derivationsToAdd = new ArrayList<Derivation>();
 
       for (Derivation derivation: allDerivations) {
+        // We need to make a copy of the derivation. This is because if we need to branch our derivation,
+        // we only find out once we've already changed the current derivation. At which point we need the
+        // original derivation.
+        Derivation copyDerivation = new Derivation(derivation);
         Word word = derivation.getLatestWord();
 
         int wordIndex = 0;
-        boolean added = false;
+        boolean added = false;  // Bool denoting if we already made a change for this step in this derivation. If true, branch off
         for (Symbol symbol: word) {
           if (symbol.isTerminal()) {
             wordIndex++;
@@ -55,7 +59,7 @@ public class Parser implements IParser {
             Word newWord = word.replace(wordIndex, expansion);
             
             if (added) {
-              Derivation newDerivation = new Derivation(derivation);
+              Derivation newDerivation = new Derivation(copyDerivation);
               newDerivation.addStep(newWord, rule, wordIndex);
               derivationsToAdd.add(newDerivation);
             } else {
@@ -72,23 +76,76 @@ public class Parser implements IParser {
 
   public boolean isInLanguage(ContextFreeGrammar cfg, Word w){
     int wordLength = w.length();
-    int numberDerivations = (2 * wordLength) - 1;
+    int numberDerivations;
+    if (wordLength == 0) {
+      numberDerivations = 0;
+    } else {
+      numberDerivations = (2 * wordLength) - 1;
+    }
 
     List<Derivation> allDerivations = generateDerivations(cfg, numberDerivations);
 
     for (Derivation derivation: allDerivations) {
-      for (Step step: derivation) {
-        System.out.println(step);
+      if (w.equals(derivation.getLatestWord())) {
+        return true;
       }
-      System.out.println("----------------------");
-      // if (w.equals(derivation.getLatestWord())) {
-      //   return true;
-      // }
     }
     return false;
   }
 
+  private ParseTreeNode buildParseTreeNode(Derivation d) {
+    Word finalWord = d.getLatestWord();
+    List<ParseTreeNode> endNodes = new ArrayList<ParseTreeNode>();
+    for (Symbol s: finalWord) {
+      endNodes.add(new ParseTreeNode(s));
+    }
+    
+    for (Step s: d) {
+      Rule parentRule = s.getRule();
+      if (parentRule == null) {
+        break;
+      }
+      Symbol parentSymbol = parentRule.getVariable();
+      int stepIndex = s.getIndex();
+      Word expansion = s.getRule().getExpansion();
+      if (expansion.length() > 1) {
+        ParseTreeNode parentNode = new ParseTreeNode(parentSymbol, endNodes.get(stepIndex), endNodes.get(stepIndex + 1));
+        endNodes.remove(stepIndex);
+        endNodes.remove(stepIndex);
+        endNodes.add(stepIndex, parentNode);
+      } else {
+        ParseTreeNode parentNode = new ParseTreeNode(parentSymbol, endNodes.get(stepIndex));
+        endNodes.remove(stepIndex);
+        endNodes.add(stepIndex, parentNode);
+      }
+
+    }
+    return endNodes.get(0);
+  }
+
   public ParseTreeNode generateParseTree(ContextFreeGrammar cfg, Word w) {
-    return null;
+    int wordLength = w.length();
+    int numberDerivations;
+    if (wordLength == 0) {
+      numberDerivations = 0;
+    } else {
+      numberDerivations = (2 * wordLength) - 1;
+    }
+
+    List<Derivation> allDerivations = generateDerivations(cfg, numberDerivations);
+
+    Derivation d = null;
+    for (Derivation derivation: allDerivations) {
+      if (w.equals(derivation.getLatestWord())) {
+        d = derivation;
+      }
+    }
+    ParseTreeNode ptn = null;
+    if (d != null) {
+      ptn = buildParseTreeNode(d);
+    } else {
+      ptn = null;
+    }
+    return ptn;
   }
 }
