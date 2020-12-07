@@ -71,6 +71,10 @@ public class Parser implements IParser {
         }
       }
     }
+    // Add any existing derivations to add to all derivations! This isnt called for the final loop otherwise.
+    for (Derivation dToAdd: derivationsToAdd) {
+      allDerivations.add(dToAdd);
+    }
     return allDerivations;
   }
 
@@ -78,7 +82,7 @@ public class Parser implements IParser {
     int wordLength = w.length();
     int numberDerivations;
     if (wordLength == 0) {
-      numberDerivations = 0;
+      numberDerivations = 1;
     } else {
       numberDerivations = (2 * wordLength) - 1;
     }
@@ -124,28 +128,22 @@ public class Parser implements IParser {
   }
 
   public ParseTreeNode generateParseTree(ContextFreeGrammar cfg, Word w) {
-    int wordLength = w.length();
-    int numberDerivations;
-    if (wordLength == 0) {
-      numberDerivations = 0;
-    } else {
-      numberDerivations = (2 * wordLength) - 1;
-    }
+    if (isInLanguage(cfg, w)) {
+      int wordLength = w.length();
+      if (wordLength == 0) {
+        ParseTreeNode ptn = ParseTreeNode.emptyParseTree(cfg.getStartVariable());
+        return ptn;
+      }
 
-    List<Derivation> allDerivations = generateDerivations(cfg, numberDerivations);
-
-    Derivation d = null;
-    for (Derivation derivation: allDerivations) {
-      if (w.equals(derivation.getLatestWord())) {
-        d = derivation;
+      int numberDerivations = (2 * wordLength) - 1;
+      List<Derivation> allDerivations = generateDerivations(cfg, numberDerivations);
+      for (Derivation derivation: allDerivations) {
+        if (w.equals(derivation.getLatestWord())) {
+          ParseTreeNode ptn = buildParseTreeNode(derivation);
+          return ptn;
+        }
       }
     }
-    ParseTreeNode ptn = null;
-    if (d != null) {
-      ptn = buildParseTreeNode(d);
-    } else {
-      ptn = null;
-    }
-    return ptn;
+    return null;
   }
 }
